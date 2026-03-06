@@ -1,0 +1,269 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Worker Safety Monitoring Dashboard</title>
+
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+    <style>
+        .status-safe { color:green; font-weight:bold; }
+        .status-warning { color:orange; font-weight:bold; }
+        .status-critical { color:red; font-weight:bold; }
+    </style>
+
+</head>
+
+<body class="bg-light">
+
+<div class="container mt-4">
+
+    <h2 class="text-center mb-4">Worker Safety Monitoring Dashboard</h2>
+
+    <!-- LIVE SENSOR VALUES -->
+
+    <div class="row mb-4">
+
+        <div class="col-md-2">
+            <div class="card text-center">
+                <div class="card-body">
+                    <h6>Heart Rate</h6>
+                    <h3 id="heartRate">--</h3>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-md-2">
+            <div class="card text-center">
+                <div class="card-body">
+                    <h6>SpO2</h6>
+                    <h3 id="spo2">--</h3>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-md-2">
+            <div class="card text-center">
+                <div class="card-body">
+                    <h6>Temperature</h6>
+                    <h3 id="temperature">--</h3>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-md-2">
+            <div class="card text-center">
+                <div class="card-body">
+                    <h6>CO Level</h6>
+                    <h3 id="coLevel">--</h3>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-md-2">
+            <div class="card text-center">
+                <div class="card-body">
+                    <h6>Air Quality</h6>
+                    <h3 id="airQuality">--</h3>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-md-2">
+            <div class="card text-center">
+                <div class="card-body">
+                    <h6>Status</h6>
+                    <h3 id="status">--</h3>
+                </div>
+            </div>
+        </div>
+
+    </div>
+
+
+    <!-- CHARTS -->
+
+    <div class="row">
+
+        <div class="col-md-6 mb-4">
+            <canvas id="heartChart"></canvas>
+        </div>
+
+        <div class="col-md-6 mb-4">
+            <canvas id="coChart"></canvas>
+        </div>
+
+        <div class="col-md-6 mb-4">
+            <canvas id="tempChart"></canvas>
+        </div>
+
+        <div class="col-md-6 mb-4">
+            <canvas id="airChart"></canvas>
+        </div>
+
+    </div>
+
+
+    <!-- DATA TABLE -->
+
+    <h4 class="mt-4">Recent Sensor Data</h4>
+
+    <table class="table table-striped">
+
+        <thead>
+        <tr>
+            <th>Time</th>
+            <th>HR</th>
+            <th>SpO2</th>
+            <th>Temp</th>
+            <th>CO</th>
+            <th>Air</th>
+            <th>Status</th>
+        </tr>
+        </thead>
+
+        <tbody id="dataTable">
+        </tbody>
+
+    </table>
+
+</div>
+
+
+
+<script>
+
+    let heartChart, coChart, tempChart, airChart;
+
+    function createCharts(){
+
+    heartChart = new Chart(document.getElementById("heartChart"),{
+    type:"line",
+    data:{labels:[],datasets:[{label:"Heart Rate",data:[],borderWidth:2}]}
+    });
+
+    coChart = new Chart(document.getElementById("coChart"),{
+    type:"line",
+    data:{labels:[],datasets:[{label:"CO Level",data:[],borderWidth:2}]}
+    });
+
+    tempChart = new Chart(document.getElementById("tempChart"),{
+    type:"line",
+    data:{labels:[],datasets:[{label:"Temperature",data:[],borderWidth:2}]}
+    });
+
+    airChart = new Chart(document.getElementById("airChart"),{
+    type:"line",
+    data:{labels:[],datasets:[{label:"Air Quality",data:[],borderWidth:2}]}
+    });
+
+    }
+
+
+    async function updateDashboard(){
+
+    const response = await fetch("/data");
+    const data = await response.json();
+
+    if(data.length===0) return;
+
+    const latest = data[0];
+
+    document.getElementById("heartRate").innerText = latest.heart_rate;
+    document.getElementById("spo2").innerText = latest.spo2;
+    document.getElementById("temperature").innerText = latest.temperature;
+    document.getElementById("coLevel").innerText = latest.co_level;
+    document.getElementById("airQuality").innerText = latest.air_quality;
+
+
+    const statusElement = document.getElementById("status");
+
+    if(latest.status_code === 0){
+    statusElement.innerText="SAFE";
+    statusElement.className="status-safe";
+    }
+
+    else if(latest.status_code === 1){
+    statusElement.innerText="WARNING";
+    statusElement.className="status-warning";
+    }
+
+    else{
+    statusElement.innerText="CRITICAL";
+    statusElement.className="status-critical";
+    }
+
+
+
+    const labels = [];
+    const heartRates = [];
+    const coLevels = [];
+    const temps = [];
+    const airs = [];
+
+    // Create a copy for charts (Oldest -> Newest)
+    const chartData = [...data].reverse();
+
+    chartData.forEach(row=>{
+    labels.push(row.timestamp);
+    heartRates.push(row.heart_rate);
+    coLevels.push(row.co_level);
+    temps.push(row.temperature);
+    airs.push(row.air_quality);
+    });
+
+
+    heartChart.data.labels = labels;
+    heartChart.data.datasets[0].data = heartRates;
+    heartChart.update();
+
+    coChart.data.labels = labels;
+    coChart.data.datasets[0].data = coLevels;
+    coChart.update();
+
+    tempChart.data.labels = labels;
+    tempChart.data.datasets[0].data = temps;
+    tempChart.update();
+
+    airChart.data.labels = labels;
+    airChart.data.datasets[0].data = airs;
+    airChart.update();
+
+
+    const table = document.getElementById("dataTable");
+    table.innerHTML="";
+
+    data.forEach(row=>{
+
+    let statusText="SAFE";
+
+    if(row.status_code===1) statusText="WARNING";
+    if(row.status_code===2) statusText="CRITICAL";
+
+    table.innerHTML += `
+    <tr>
+    <td>${row.timestamp}</td>
+    <td>${row.heart_rate}</td>
+    <td>${row.spo2}</td>
+    <td>${row.temperature}</td>
+    <td>${row.co_level}</td>
+    <td>${row.air_quality}</td>
+    <td>${statusText}</td>
+    </tr>
+    `;
+
+    });
+
+    }
+
+
+    createCharts();
+    updateDashboard();
+
+    setInterval(updateDashboard,2000);
+
+</script>
+
+</body>
+</html>
